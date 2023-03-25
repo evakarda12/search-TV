@@ -1,0 +1,46 @@
+import telegram
+from telegram.ext import CommandHandler, MessageHandler, Filters
+import requests
+from bs4 import BeautifulSoup
+
+# Set up the bot and API key
+bot = telegram.Bot(token='YOUR_API_KEY')
+
+# Define the start command handler
+def start(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Hello! Welcome to the Film Search Bot. Please type the name of the film you want to search.")
+
+# Define the search command handler
+def search(update, context):
+    film_name = update.message.text
+    search_url = f"https://www.imdb.com/find?q={film_name}&s=tt&ttype=ft&ref_=fn_ft"
+    response = requests.get(search_url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    results = soup.find_all('td', class_='result_text')
+    if len(results) == 0:
+        message = "Sorry, no results found for that film."
+    else:
+        message = "Search results:\n"
+        for i in range(min(5, len(results))):
+            title = results[i].a.text
+            year = results[i].span.text
+            link = "https://www.imdb.com" + results[i].a.get('href')
+            message += f"{i+1}. {title} ({year})\n{link}\n\n"
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+
+# Define the error handler
+def error(update, context):
+    print(f"Update {update} caused error {context.error}")
+
+# Set up the command handlers
+start_handler = CommandHandler('start', start)
+search_handler = MessageHandler(Filters.text & (~Filters.command), search)
+error_handler = MessageHandler(Filters.all, error)
+dispatcher = updater.dispatcher
+dispatcher.add_handler(start_handler)
+dispatcher.add_handler(search_handler)
+dispatcher.add_handler(error_handler)
+
+# Start the bot
+updater.start_polling()
+updater.idle()
